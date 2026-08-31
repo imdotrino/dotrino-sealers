@@ -98,7 +98,7 @@ export function startSealersService ({
     installNodeGlobals(dir)
 
     const { getWebSocketProxyClient } = await import('@dotrino/proxy-client')
-    const { signWithDevice } = await import('@dotrino/identity/capabilities')
+    const { signWithDevice, pubkeyId } = await import('@dotrino/identity/capabilities')
     const url = proxyUrl || link?.proxy || 'wss://proxy.dotrino.com'
     const client = getWebSocketProxyClient({
       url, enableWebRTC: false, autoReconnect: true, maxReconnectAttempts: 100000, reconnectDelay: 4000
@@ -127,8 +127,11 @@ export function startSealersService ({
         .then((r) => { try { client.send(from, { op: OP + '.result', ...r }) } catch (_) {} })
     })
 
-    log(`[sealers] listening on the proxy as ${device?.publickey ? device.publickey.slice(0, 12) : '?'} · repo ${repo}`)
-    return { atender, client, pubkey: device?.publickey, close: async () => { try { client.disconnect?.() } catch (_) {} } }
+    // El id corto, no la pubkey: una pubkey es un JWK entero y en el log salía el
+    // `{"key_ops":[` en vez de algo que alguien pueda comparar de un vistazo.
+    const id = device?.publickey ? (await pubkeyId(device.publickey)).slice(0, 8).toUpperCase() : '????????'
+    log(`[sealers] listening on the proxy as ${id} · repo ${repo}`)
+    return { atender, client, id, pubkey: device?.publickey, close: async () => { try { client.disconnect?.() } catch (_) {} } }
   })()
 }
 
