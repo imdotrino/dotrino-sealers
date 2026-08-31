@@ -15,10 +15,21 @@ Documentación de uso: **<https://wiki.dotrino.com/vault/registro-selladores/>**
 nombres, qué servicios corre y cuándo entró cada uno: publicarla sería colgar el inventario
 de una casa en un repo público. Y cambian con cada emparejamiento.
 
-Lo que se publica es el subconjunto que casi nunca cambia: los eslabones con
-`sealerChanged`, encadenados por `sealerAnchor` desde el génesis. Un usuario con una sola
-bóveda **no aparece nunca** — no puede cambiar de selladores, así que no tiene nada que
-pueda quedar obsoleto. Quien suma una segunda bóveda escribe una línea.
+Lo que se publica es el **eslabón** (`sealerLinkOf`, identity ≥ 0.72): un documento propio
+de ocho campos, firmado aparte y metido DENTRO del acta antes de firmarla. No es un acta
+recortada —recortarla no vale, su firma la cubre entera— sino otra cosa:
+
+```json
+{ "v": 1, "profileId": "…", "seq": 2, "by": "…", "sealers": ["…", "…"],
+  "prev": { "seq": 1, "hash": "6b7aead…" }, "iat": 1788220371160, "sig": "…" }
+```
+
+Llaves públicas, un número y una firma. Ningún aparato, ninguna etiqueta, ningún cajón,
+ningún llavero. Y encadena contra el **eslabón** anterior, no contra el acta anterior: el
+`sealerAnchor` del acta apunta a un hash que quien lee el registro no puede calcular.
+
+Un usuario con una sola bóveda **no aparece nunca** — no puede cambiar de selladores, así
+que no tiene nada que pueda quedar obsoleto. Quien suma una segunda escribe una línea.
 
 Cada identidad vive bajo el sha256 de su `profileId`:
 
@@ -30,6 +41,14 @@ chains/6f/6f3a…c1/7.json      ← el eslabón donde entró la segunda bóveda
 Eso no es privacidad —tu `profileId` viaja en cada firma tuya, así que quien te haya leído
 puede calcular el nombre de tu carpeta— sino **no enumerabilidad**: quien clone el registro
 entero no se lleva una lista de llaves públicas lista para correlacionar.
+
+### Por qué firmado dos veces
+
+El eslabón se firma, se mete en el acta, y el acta se firma encima. De ahí sale que no
+puedan contradecirse: quien tiene el acta la verifica y con eso el eslabón de dentro queda
+validado —no hay un segundo documento en el que confiar—, y quien solo tiene el registro
+verifica la firma del eslabón, que es de la misma llave y dice lo mismo. `verifyActa`
+comprueba además que el eslabón y el acta digan lo mismo sobre quién sella.
 
 ## Por qué se puede confiar en él sin confiar en él
 
