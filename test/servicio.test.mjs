@@ -8,7 +8,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { genesisActa, sealActa, applyChanges } from '@dotrino/identity/acta'
+import { genesisActa, sealActa, applyChanges, sealerLinkOf } from '@dotrino/identity/acta'
 import { makeDeviceKey } from '@dotrino/identity/capabilities'
 import { startSealersService, OP, CUOTA } from '../src/index.js'
 import { createGitHub, YaExiste } from '../src/github.js'
@@ -27,13 +27,14 @@ function githubFalso () {
   }
 }
 
+/** Lo que se deposita son los ESLABONES, no las actas: ocho campos y ningún aparato. */
 async function cadenaBuena () {
   const A = await makeDeviceKey()
   const B = await makeDeviceKey()
   const g = await sealActa({ acta: genesisActa({ pub: A.publickey, label: 'A' }), privateJwk: A.privateJwk })
   let dos = await applyChanges(g, [{ op: 'admit', member: { pub: B.publickey, label: 'B', caps: ['sign', 'sealer'] } }], { by: A.publickey })
   dos = await sealActa({ acta: dos, privateJwk: A.privateJwk })
-  return [g, dos]
+  return [sealerLinkOf(g), sealerLinkOf(dos)]
 }
 
 const servicio = (gh) => startSealersService({ github: gh, repo: 'x/y', log: () => {}, agent: false })
@@ -64,7 +65,7 @@ test('lo que ya está publicado NO se puede pisar', async () => {
   const antes = new Map(gh.archivos)
 
   // Alguien reenvía la misma cadena con el génesis manipulado.
-  const falseada = [{ ...chain[0], label: 'otra cosa' }, chain[1]]
+  const falseada = [{ ...chain[0], iat: 1 }, chain[1]]
   await s.atender({ op: OP, chain: falseada })
   assert.deepEqual([...gh.archivos], [...antes], 'el contenido publicado no cambió')
 })
@@ -72,7 +73,7 @@ test('lo que ya está publicado NO se puede pisar', async () => {
 test('una cadena inválida se rechaza y no escribe nada', async () => {
   const gh = githubFalso()
   const s = await servicio(gh)
-  const r = await s.atender({ op: OP, chain: [{ seq: 1, sealerChanged: true }, { seq: 2, sealerChanged: true }] })
+  const r = await s.atender({ op: OP, chain: [{ v: 1, seq: 1 }, { v: 1, seq: 2 }] })
   assert.equal(r.ok, false)
   assert.equal(gh.archivos.size, 0)
 })
@@ -102,7 +103,7 @@ test('el cliente de GitHub traduce el 422 en «ya existe», no en un fallo', asy
 test('la cuota corta a quien insiste, y no a quien deposita una vez', async () => {
   const gh = githubFalso()
   const s = await servicio(gh)
-  const basura = { op: OP, chain: [{ seq: 1, sealerChanged: true }, { seq: 2, sealerChanged: true }] }
+  const basura = { op: OP, chain: [{ v: 1, seq: 1 }, { v: 1, seq: 2 }] }
 
   let cortado = 0
   for (let i = 0; i < CUOTA.porVentana + 5; i++) {
