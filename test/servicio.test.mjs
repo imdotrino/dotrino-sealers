@@ -10,7 +10,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { genesisActa, sealActa, applyChanges } from '@dotrino/identity/acta'
 import { makeDeviceKey } from '@dotrino/identity/capabilities'
-import { startSealersService, OP } from '../src/index.js'
+import { startSealersService, OP, CUOTA } from '../src/index.js'
 import { createGitHub, YaExiste } from '../src/github.js'
 
 /** Un GitHub de mentira que se comporta como el de verdad en lo único que importa. */
@@ -97,4 +97,21 @@ test('si GitHub falla, se contesta el fallo — no se dice que se publicó', asy
 test('el cliente de GitHub traduce el 422 en «ya existe», no en un fallo', async () => {
   const gh = createGitHub({ token: 't', repo: 'a/b', fetch: async () => ({ status: 422, ok: false, text: async () => '' }) })
   await assert.rejects(() => gh.crear('chains/aa/aa/1.json', '{}', 'm'), (e) => e instanceof YaExiste && e.code === 'ya-existe')
+})
+
+test('la cuota corta a quien insiste, y no a quien deposita una vez', async () => {
+  const gh = githubFalso()
+  const s = await servicio(gh)
+  const basura = { op: OP, chain: [{ seq: 1, sealerChanged: true }, { seq: 2, sealerChanged: true }] }
+
+  let cortado = 0
+  for (let i = 0; i < CUOTA.porVentana + 5; i++) {
+    const r = await s.atender(basura, 'el-pesado')
+    if (/demasiadas peticiones/.test(r.error || '')) cortado++
+  }
+  assert.equal(cortado, 5, 'corta pasada la cuota, no antes')
+
+  // Y la cuota es POR REMITENTE: el que llega el primero no paga por el pesado.
+  const otro = await s.atender({ op: OP, chain: await cadenaBuena() }, 'otro')
+  assert.equal(otro.ok, true, otro.error)
 })

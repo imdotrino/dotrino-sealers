@@ -7,7 +7,7 @@
  * el servidor, sin rotar nada a mano. Es el mismo patrón de los proxios y del bot social.
  */
 import { fetchSecrets } from '@dotrino/vault/service'
-import { enrollWithVault, loadLink, dataDir } from '@dotrino/remote-agent/link'
+import { enroll, loadLink, dataDir } from '@dotrino/remote-agent/link'
 import { startSealersService } from './index.js'
 
 const NS = process.env.SEALERS_NS || 'sealers'
@@ -32,8 +32,14 @@ const [cmd, ...rest] = process.argv.slice(2)
 if (cmd === 'enroll') {
   const invitacion = rest.join(' ').trim()
   if (!invitacion) { console.error('uso: dotrino-sealers enroll <invitación>'); process.exit(2) }
-  const r = await enrollWithVault({ invite: invitacion, dir: DIR, label: 'sealers' })
-  console.log('enrolado:', r?.deviceId || 'ok')
+  // `ns` no es decoración: hace que el enrolamiento EXIJA que el cert traiga
+  // `vault:secrets:sealers`. Sin eso el servicio entraría en la cuenta y descubriría al
+  // arrancar que no puede leer su cajón — o peor, que le dieron uno que no es el suyo.
+  const link = await enroll({
+    qr: invitacion, dir: DIR, label: 'sealers', ns: NS,
+    onChallenge: (c) => console.log(`\nAprueba en la bóveda:  dotrino-vault approve ${c.code || c}\n`)
+  })
+  console.log('enrolado · proxio', link.proxy)
 } else if (cmd === 'run') {
   const repo = process.env.SEALERS_REPO
   if (!repo) { console.error('falta SEALERS_REPO (owner/nombre)'); process.exit(2) }
@@ -49,5 +55,5 @@ if (cmd === 'enroll') {
   const token = secretos?.GITHUB_TOKEN
   if (!token) { console.error(`el cajón "${NS}" no tiene GITHUB_TOKEN`); process.exit(1) }
 
-  await startSealersService({ token, repo, dir: DIR })
+  await startSealersService({ token, repo, dir: DIR, link })
 } else uso()

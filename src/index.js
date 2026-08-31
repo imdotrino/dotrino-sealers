@@ -1,42 +1,66 @@
 /**
  * index.js — el testigo: recibe eslabones por el PROXIO y los publica en el repo.
  *
- * POR QUÉ POR EL PROXIO Y NO POR HTTP (dueño, 2026-08-31). El servicio ya está enrolado en
- * el acta de Dotrino, así que está en el proxio: recibir por ahí no abre ningún puerto, no
- * expone ninguna URL, y no hay CORS ni límite de peticiones que diseñar. Quien publica ya
- * viene identificado por el transporte.
+ * POR QUÉ ESCUCHA EN EL PROXIO Y NO EN UN PUERTO. El servicio ya tiene una identidad del
+ * ecosistema, así que recibir por ahí no abre ningún puerto, no expone ninguna URL, y no
+ * hay CORS ni rate-limit de HTTP que diseñar. Es transporte prestado, nada más.
  *
- * QUIÉN PUEDE PUBLICAR: cualquiera. Y no es descuido — un eslabón **se verifica solo**
- * contra el génesis de su propia identidad, así que publicarlo no es un privilegio, es un
- * favor que puede hacer cualquiera. Eso es lo que permite que si tu bóveda estaba apagada
- * cuando tocaba, lo deposite después otro aparato tuyo o incluso quien te verificó.
+ * POR QUÉ NO ES UN `startRemoteAgent`, que sería lo obvio: un agente remoto verifica al
+ * cliente contra SU PROPIA cuenta (`verifyChain({ trustedIssuer: master })`), así que solo
+ * los aparatos de Dotrino podrían depositar. Aquí hace falta lo contrario — **publicar
+ * puede cualquiera**. Y no es descuido: un eslabón se verifica solo contra el génesis de su
+ * identidad, así que depositarlo no es un privilegio sino un favor. Eso es justo lo que
+ * permite que, si tu bóveda estaba apagada cuando tocaba, lo deposite después otro aparato
+ * tuyo o incluso quien te verificó.
  *
- * LO QUE ESTE SERVICIO NO PUEDE HACER: mentir. No inventa cadenas ni cambia las que hay
- * (el repo es append-only por construcción, ver `github.js`). Lo peor que puede hacer un
+ * Y POR ESO TAMPOCO SE SELLA el mensaje (§4.1 pide sellar los dirigidos): lo que viaja va a
+ * acabar en un repo PÚBLICO, que es su propósito — mismo caso que los canales
+ * `publish`/`list`, exentos por la misma razón. Sellarlo además obligaría a conocer la
+ * llave de cifrado del testigo, que es exactamente la barrera que aquí no debe existir.
+ *
+ * LO QUE ESTE SERVICIO NO PUEDE HACER: mentir. No inventa cadenas ni pisa las que hay (el
+ * repo es append-only por construcción, ver `github.js`). Lo peor que puede hacer un
  * registro comprometido es CALLARSE, y contra eso la defensa no es confiar más en él: es
- * que haya varios y se puedan comparar. Por eso el repo es público y clonable — un
- * `git clone` te convierte en testigo.
+ * que haya varios y se puedan comparar. Por eso el repo es público — un `git clone` te
+ * convierte en testigo.
  */
-import { startRemoteAgent } from '@dotrino/remote-agent/agent'
 import { validarCadena } from './validate.js'
 import { createGitHub, YaExiste } from './github.js'
 
 export const OP = 'sealers.publish'
 
 /**
- * @param {object} opts
- * @param {string} opts.token     token de GitHub con escritura al repo (del cajón del vault)
- * @param {string} opts.repo      "owner/nombre"
- * @param {string} [opts.branch]
- * @param {string} [opts.dir]     dir del enlace del agente
- * @param {(m:string)=>void} [opts.log]
+ * CUOTA POR REMITENTE. No protege el registro —lo publicado se verifica solo— sino el
+ * trabajo: comprobar firmas cuesta CPU y escribir cuesta cuota de la API de GitHub. Una
+ * cuenta legítima deposita una vez cada muchos meses, así que esto no le roza.
  */
-export async function startSealersService ({ token, repo, branch = 'main', dir, proxyUrl, log = console.log, github, agent = true } = {}) {
-  const gh = github || createGitHub({ token, repo, branch })
+export const CUOTA = { ventanaMs: 60_000, porVentana: 20 }
 
-  /** Atiende una petición ya descifrada. Separado para poder probarlo sin proxio. */
-  async function atender (msg) {
+export function startSealersService ({
+  token, repo, branch = 'main', dir, proxyUrl, log = console.log, github, link, agent = true
+} = {}) {
+  const gh = github || createGitHub({ token, repo, branch })
+  const vistos = new Map()
+
+  /** ¿Este remitente pasó de la cuota? Se dice en el log: un límite callado miente. */
+  function pasaCuota (quien) {
+    const ahora = Date.now()
+    const t = (vistos.get(quien) || []).filter((x) => ahora - x < CUOTA.ventanaMs)
+    if (t.length >= CUOTA.porVentana) {
+      log(`[sealers] rate-limited ${String(quien).slice(0, 8)}: ${t.length} requests in the last minute`)
+      vistos.set(quien, t)
+      return false
+    }
+    t.push(ahora)
+    vistos.set(quien, t)
+    return true
+  }
+
+  /** Atiende una petición. Separado del transporte para poder probarlo sin red. */
+  async function atender (msg, quien = 'anon') {
     if (msg?.op !== OP) return { ok: false, error: 'op desconocida' }
+    if (!pasaCuota(quien)) return { ok: false, error: 'demasiadas peticiones, prueba en un minuto' }
+
     const v = await validarCadena(msg.chain)
     if (!v.ok) {
       log(`[sealers] rejected: ${v.error}`)
@@ -65,25 +89,47 @@ export async function startSealersService ({ token, repo, branch = 'main', dir, 
   // `agent: false` deja el servicio sin transporte, solo con `atender`. Es como se prueba
   // lo que decide qué se escribe sin depender de una red ni de GitHub — que es justo la
   // parte que no puede fallar.
-  if (!agent) return { atender, close: async () => {} }
+  if (!agent) return Promise.resolve({ atender, close: async () => {} })
 
-  const agente = await startRemoteAgent({
-    label: 'sealers',
-    dir,
-    proxyUrl,
-    onReady: () => log(`[sealers] listening on the proxy · repo ${repo}`),
-    onSession: (s) => {
-      s.on('message', async (msg) => {
-        let r
-        // Nunca se cae por una petición: un testigo que se muere con un mensaje raro deja
-        // de ser testigo justo cuando alguien tiene interés en que lo deje de ser.
-        try { r = await atender(msg) } catch (e) { r = { ok: false, error: e.message } }
-        s.send(r).catch(() => {})
-      })
+  return (async () => {
+    const { installNodeGlobals } = await import('@dotrino/remote-agent/node-globals')
+    // Sin esto el proxy-client no encuentra dónde guardar su llave de transporte y ESTRENA
+    // una en cada arranque: el testigo cambiaría de identidad cada vez que se reinicia.
+    installNodeGlobals(dir)
+
+    const { getWebSocketProxyClient } = await import('@dotrino/proxy-client')
+    const { signWithDevice } = await import('@dotrino/identity/capabilities')
+    const url = proxyUrl || link?.proxy || 'wss://proxy.dotrino.com'
+    const client = getWebSocketProxyClient({
+      url, enableWebRTC: false, autoReconnect: true, maxReconnectAttempts: 100000, reconnectDelay: 4000
+    })
+    await client.connect()
+
+    // IDENTIFICARSE bajo la llave del aparato: así el testigo tiene SIEMPRE la misma
+    // pubkey —la que la gente pone en su configuración— y le llega lo que le manden por
+    // ella, incluso lo que se envió mientras estaba caído (cola de 24 h del proxio).
+    const device = link?.device
+    const identify = async () => {
+      if (!device || !client.token) return
+      const data = { op: 'identify', publickey: device.publickey, token: client.token, ts: Date.now() }
+      const { signature } = await signWithDevice({ privateJwk: device.privateJwk, data })
+      await client.identify({ data, signature })
     }
-  })
+    await identify()
+    client.on('token', () => { identify().catch(() => {}) })
 
-  return { ...agente, atender }
+    client.on('message', (from, payload) => {
+      if (payload?.op !== OP) return
+      // Nunca se cae por una petición: un testigo que se muere con un mensaje raro deja de
+      // ser testigo justo cuando alguien tiene interés en que lo deje de ser.
+      atender(payload, payload.publickey || from)
+        .catch((e) => ({ ok: false, error: e.message }))
+        .then((r) => { try { client.send(from, { op: OP + '.result', ...r }) } catch (_) {} })
+    })
+
+    log(`[sealers] listening on the proxy as ${device?.publickey ? device.publickey.slice(0, 12) : '?'} · repo ${repo}`)
+    return { atender, client, pubkey: device?.publickey, close: async () => { try { client.disconnect?.() } catch (_) {} } }
+  })()
 }
 
-export default { startSealersService, OP }
+export default { startSealersService, OP, CUOTA }

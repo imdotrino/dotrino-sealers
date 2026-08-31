@@ -49,10 +49,16 @@ cosa que no sea añadir.
 
 Dos caminos, y el segundo existe porque el primero no debe ser obligatorio:
 
-1. **Por el proxio** (lo normal). Se manda `{ op: 'sealers.publish', chain }` al servicio,
-   que valida y hace el commit. **Puede publicar cualquiera** — un eslabón se verifica
-   solo, así que depositarlo no es un privilegio sino un favor: si tu bóveda estaba apagada
-   cuando tocaba, lo deposita después otro aparato tuyo o quien te verificó.
+1. **Por el proxio** (lo normal). Se manda `{ op: 'sealers.publish', chain }` a la pubkey
+   del testigo con `sendByPubkey`, y contesta con `sealers.publish.result`. **Puede
+   publicar cualquiera** — un eslabón se verifica solo, así que depositarlo no es un
+   privilegio sino un favor: si tu bóveda estaba apagada cuando tocaba, lo deposita después
+   otro aparato tuyo o quien te verificó.
+
+   Por eso el testigo **no** es un `startRemoteAgent`: un agente remoto verifica al cliente
+   contra su propia cuenta, y aquí hace falta lo contrario. Escucha en el proxio
+   identificado con su llave, y acepta de quien sea, con una cuota por remitente (20/min)
+   que solo protege el trabajo de comprobar firmas y la cuota de la API de GitHub.
 2. **Por PR**, a mano, añadiendo los archivos. El validador de CI comprueba lo mismo.
 
 ## Correr el testigo

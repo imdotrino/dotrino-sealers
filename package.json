@@ -8,17 +8,27 @@
     ".": "./src/index.js",
     "./validate": "./src/validate.js"
   },
-  "bin": { "dotrino-sealers": "./src/cli.js" },
-  "files": ["src", "README.md", "LICENSE"],
+  "bin": {
+    "dotrino-sealers": "./src/cli.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node --test \"test/*.test.mjs\"",
     "start": "node src/cli.js run"
   },
   "dependencies": {
     "@dotrino/identity": "0.71.0",
-    "@dotrino/remote-agent": "0.5.3",
+    "@dotrino/proxy-client": "0.13.1",
+    "@dotrino/remote-agent": "0.5.4",
     "@dotrino/vault": "0.42.0"
   },
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/imdotrino/dotrino-sealers.git" }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imdotrino/dotrino-sealers.git"
+  }
 }
