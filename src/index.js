@@ -31,7 +31,7 @@ export const OP = 'sealers.publish'
  * @param {string} [opts.dir]     dir del enlace del agente
  * @param {(m:string)=>void} [opts.log]
  */
-export async function startSealersService ({ token, repo, branch = 'main', dir, proxyUrl, log = console.log, github } = {}) {
+export async function startSealersService ({ token, repo, branch = 'main', dir, proxyUrl, log = console.log, github, agent = true } = {}) {
   const gh = github || createGitHub({ token, repo, branch })
 
   /** Atiende una petición ya descifrada. Separado para poder probarlo sin proxio. */
@@ -61,6 +61,11 @@ export async function startSealersService ({ token, repo, branch = 'main', dir, 
     log(`[sealers] ${v.id.slice(0, 8)} seq ${v.seq}: ${escritos.length} nuevo(s), ${yaEstaban.length} ya estaba(n)`)
     return { ok: true, id: v.id, seq: v.seq, escritos, yaEstaban }
   }
+
+  // `agent: false` deja el servicio sin transporte, solo con `atender`. Es como se prueba
+  // lo que decide qué se escribe sin depender de una red ni de GitHub — que es justo la
+  // parte que no puede fallar.
+  if (!agent) return { atender, close: async () => {} }
 
   const agente = await startRemoteAgent({
     label: 'sealers',
