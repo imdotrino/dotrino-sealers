@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "profileId": "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"h9C-cqJcrcqP2HMsF29sgg0SBcumOOw1ZUGQUWjVO74\",\"y\":\"8Xs13reNbWl5F7QV7sy8oQOWZf1JCcGCFdWUB7fWw_8\",\"crv\":\"P-256\"}",
+  "seq": 1,
+  "by": "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"h9C-cqJcrcqP2HMsF29sgg0SBcumOOw1ZUGQUWjVO74\",\"y\":\"8Xs13reNbWl5F7QV7sy8oQOWZf1JCcGCFdWUB7fWw_8\",\"crv\":\"P-256\"}",
+  "sealers": [
+    "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"h9C-cqJcrcqP2HMsF29sgg0SBcumOOw1ZUGQUWjVO74\",\"y\":\"8Xs13reNbWl5F7QV7sy8oQOWZf1JCcGCFdWUB7fWw_8\",\"crv\":\"P-256\"}"
+  ],
+  "prev": null,
+  "iat": 1788220371158,
+  "sig": "Q2JyGwXu6b7dK3YK7Q9ep13RoDLA39FmTzRZ8kTLS03Ywjn+Ca05kqtXrDQWhpCrRLBQMIMOHefqZeoofGmHsw=="
+}
