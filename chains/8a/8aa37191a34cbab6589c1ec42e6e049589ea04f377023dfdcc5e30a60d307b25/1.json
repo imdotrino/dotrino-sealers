@@ -1,0 +1,43 @@
+{
+  "v": 4,
+  "profileId": "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"CDdFvH79Zx3TZaWFdlNj_LVyKdwQr9iQ1rlixoraO40\",\"y\":\"VNnZvWujsZSP2BBKiDsX1clszD25UtpwXnesjLNeunM\",\"crv\":\"P-256\"}",
+  "sealedBy": "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"CDdFvH79Zx3TZaWFdlNj_LVyKdwQr9iQ1rlixoraO40\",\"y\":\"VNnZvWujsZSP2BBKiDsX1clszD25UtpwXnesjLNeunM\",\"crv\":\"P-256\"}",
+  "chainUrl": null,
+  "seq": 1,
+  "prev": null,
+  "sealerAnchor": null,
+  "sealerChanged": true,
+  "members": [
+    {
+      "pub": "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"CDdFvH79Zx3TZaWFdlNj_LVyKdwQr9iQ1rlixoraO40\",\"y\":\"VNnZvWujsZSP2BBKiDsX1clszD25UtpwXnesjLNeunM\",\"crv\":\"P-256\"}",
+      "encPub": null,
+      "label": "A",
+      "cn": null,
+      "caps": [
+        "sign",
+        "store",
+        "read",
+        "sealer"
+      ],
+      "addedAt": 1788219503946,
+      "cert": null
+    }
+  ],
+  "revoked": [],
+  "renounced": [],
+  "keyring": [],
+  "sealPub": null,
+  "sealSince": 0,
+  "sealKeys": [],
+  "updatedAt": 1788219503946,
+  "sig": "9V0t+Z1zB3nIiTBmx6GPnCawzKOWWtE4O9kyzwbiu+ZTaW1jgHKKO6xu4xrgjrxBWGKDWxLTs27TFx3a0wpvKQ==",
+  "card": {
+    "v": 1,
+    "profileId": "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"CDdFvH79Zx3TZaWFdlNj_LVyKdwQr9iQ1rlixoraO40\",\"y\":\"VNnZvWujsZSP2BBKiDsX1clszD25UtpwXnesjLNeunM\",\"crv\":\"P-256\"}",
+    "seq": 1,
+    "sealedBy": "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"CDdFvH79Zx3TZaWFdlNj_LVyKdwQr9iQ1rlixoraO40\",\"y\":\"VNnZvWujsZSP2BBKiDsX1clszD25UtpwXnesjLNeunM\",\"crv\":\"P-256\"}",
+    "keys": [],
+    "iat": 1788219503946,
+    "sig": "5p0D9/lTJuuIKeFyWKHafIAKRnJXQGNjFu+JFdnYG+EL+2MIUoiE0q5pdUJv9Kttak9/E01LPnQiChSzGfGZIA=="
+  }
+}
