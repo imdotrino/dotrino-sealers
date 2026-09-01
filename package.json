@@ -1,6 +1,6 @@
 {
   "name": "@dotrino/sealers",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Registro público de cadenas de selladores: un testigo que cualquiera puede clonar. Guarda solo los eslabones donde cambia quién sella una identidad — no las actas.",
   "type": "module",
   "main": "src/index.js",
@@ -21,10 +21,10 @@
     "start": "node src/cli.js run"
   },
   "dependencies": {
-    "@dotrino/identity": "0.73.1",
+    "@dotrino/identity": "0.74.0",
     "@dotrino/proxy-client": "0.13.1",
-    "@dotrino/remote-agent": "0.5.4",
-    "@dotrino/vault": "0.42.0"
+    "@dotrino/remote-agent": "0.6.1",
+    "@dotrino/vault": "0.43.0"
   },
   "license": "MIT",
   "repository": {
