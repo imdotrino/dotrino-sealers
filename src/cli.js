@@ -7,7 +7,7 @@
  * el servidor, sin rotar nada a mano. Es el mismo patrón de los proxios y del bot social.
  */
 import { fetchSecrets } from '@dotrino/vault/service'
-import { enroll, loadLink, dataDir } from '@dotrino/remote-agent/link'
+import { enroll, loadLink, saveLink, dataDir } from '@dotrino/remote-agent/link'
 import { startSealersService } from './index.js'
 
 const NS = process.env.SEALERS_NS || 'sealers'
@@ -50,7 +50,17 @@ if (cmd === 'enroll') {
   // un token de otro sitio, porque entonces el vault dejaría de mandar sobre este servicio.
   const secretos = await fetchSecrets({
     ns: NS, proxyUrl: link.proxy, masterPubkey: link.iss,
-    device: link.device, cert: link.cert, enc: link.enc
+    device: link.device, cert: link.cert, enc: link.enc,
+    // EL PAPEL RENOVADO LO GUARDAMOS NOSOTROS. Esta identidad vive en NUESTRO archivo y le
+    // pasamos el enlace a mano, así que la librería no tiene dónde escribirlo: sin esto
+    // renovaba en cada arranque y volvía a empezar, y el papel del modelo viejo no se
+    // cambiaba nunca — o sea que la migración no terminaba.
+    onCert: (cert) => {
+      link.cert = cert
+      try { saveLink(DIR, link); console.log('[sealers] papel renovado · acta', cert.seq) } catch (e) {
+        console.error('[sealers] no pude guardar el papel renovado:', e.message)
+      }
+    }
   })
   const token = secretos?.GITHUB_TOKEN
   if (!token) { console.error(`el cajón "${NS}" no tiene GITHUB_TOKEN`); process.exit(1) }
