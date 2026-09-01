@@ -30,6 +30,20 @@ import { createGitHub, YaExiste } from './github.js'
 export const OP = 'sealers.publish'
 
 /**
+ * EL CANAL DONDE SE ANUNCIA. Que una bóveda sepa a qué pubkey mandar su eslabón no puede
+ * resolverse quemando la pubkey del testigo en el código (dueño, 2026-08-31: «¿no me puedes
+ * quemar un device en el código?»): re-enrolarlo se la cambia, y todo lo que la tuviera
+ * apuntada se quedaría hablando con una dirección muerta — es lo mismo que ya pasó con el
+ * `nodeId` del proxio.
+ *
+ * Lo que no cambia nunca es la IDENTIDAD. Así que el testigo se anuncia aquí con su cert, y
+ * quien lo busca acepta al que traiga un cert emitido por la identidad que sí está en su
+ * código. Re-enrolarlo da un cert nuevo de la misma identidad y sigue solo; revocarlo lo
+ * deja fuera del acta y su anuncio deja de valer.
+ */
+export const CANAL = 'dotrino.sealers'
+
+/**
  * CUOTA POR REMITENTE. No protege el registro —lo publicado se verifica solo— sino el
  * trabajo: comprobar firmas cuesta CPU y escribir cuesta cuota de la API de GitHub. Una
  * cuenta legítima deposita una vez cada muchos meses, así que esto no le roza.
@@ -130,7 +144,15 @@ export function startSealersService ({
     // El id corto, no la pubkey: una pubkey es un JWK entero y en el log salía el
     // `{"key_ops":[` en vez de algo que alguien pueda comparar de un vistazo.
     const id = device?.publickey ? (await pubkeyId(device.publickey)).slice(0, 8).toUpperCase() : '????????'
-    log(`[sealers] listening on the proxy as ${id} · repo ${repo}`)
+    // ANUNCIARSE. Se republica en cada reconexión porque el canal va por token de sesión:
+    // al reconectar el token es otro y el anuncio viejo ya no lleva a ninguna parte.
+    const anunciar = async () => {
+      try { await client.publish(CANAL, { role: 'sealers', repo, cert: link?.cert }) } catch (e) { log('[sealers] could not announce:', e.message) }
+    }
+    await anunciar()
+    client.on('token', () => { anunciar().catch(() => {}) })
+
+    log(`[sealers] listening on the proxy as ${id} · repo ${repo} · announced in ${CANAL}`)
     return { atender, client, id, pubkey: device?.publickey, close: async () => { try { client.disconnect?.() } catch (_) {} } }
   })()
 }
