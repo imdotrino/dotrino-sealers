@@ -44,6 +44,20 @@ export const OP = 'sealers.publish'
 export const CANAL = 'dotrino.sealers'
 
 /**
+ * «¿QUIÉN ERES?» — el paso que hace útil al canal.
+ *
+ * `list` del proxio devuelve TOKENS y nada más: el `extraData` del `publish` no vuelve
+ * (comprobado contra el servidor, no supuesto — la primera versión buscaba el cert dentro
+ * de la entrada del canal y no encontraba a nadie jamás). Así que el canal dice *dónde
+ * mirar* y esta operación dice *quién es*: contesta con el cert, y quien pregunta comprueba
+ * que lo emitió la identidad que lleva en su código.
+ *
+ * Sale mejor que meterlo en el anuncio: el cert llega fresco del propio testigo, y no de
+ * una entrada de canal que pudo quedarse vieja.
+ */
+export const WHOIS = 'sealers.whois'
+
+/**
  * CUOTA POR REMITENTE. No protege el registro —lo publicado se verifica solo— sino el
  * trabajo: comprobar firmas cuesta CPU y escribir cuesta cuota de la API de GitHub. Una
  * cuenta legítima deposita una vez cada muchos meses, así que esto no le roza.
@@ -72,6 +86,7 @@ export function startSealersService ({
 
   /** Atiende una petición. Separado del transporte para poder probarlo sin red. */
   async function atender (msg, quien = 'anon') {
+    if (msg?.op === WHOIS) return { ok: true, op: WHOIS + '.result', cert: link?.cert || null }
     if (msg?.op !== OP) return { ok: false, error: 'op desconocida' }
     if (!pasaCuota(quien)) return { ok: false, error: 'demasiadas peticiones, prueba en un minuto' }
 
@@ -133,12 +148,12 @@ export function startSealersService ({
     client.on('token', () => { identify().catch(() => {}) })
 
     client.on('message', (from, payload) => {
-      if (payload?.op !== OP) return
+      if (payload?.op !== OP && payload?.op !== WHOIS) return
       // Nunca se cae por una petición: un testigo que se muere con un mensaje raro deja de
       // ser testigo justo cuando alguien tiene interés en que lo deje de ser.
       atender(payload, payload.publickey || from)
         .catch((e) => ({ ok: false, error: e.message }))
-        .then((r) => { try { client.send(from, { op: OP + '.result', ...r }) } catch (_) {} })
+        .then((r) => { try { client.send(from, { op: r.op || OP + '.result', ...r }) } catch (_) {} })
     })
 
     // El id corto, no la pubkey: una pubkey es un JWK entero y en el log salía el
@@ -147,7 +162,9 @@ export function startSealersService ({
     // ANUNCIARSE. Se republica en cada reconexión porque el canal va por token de sesión:
     // al reconectar el token es otro y el anuncio viejo ya no lleva a ninguna parte.
     const anunciar = async () => {
-      try { await client.publish(CANAL, { role: 'sealers', repo, cert: link?.cert }) } catch (e) { log('[sealers] could not announce:', e.message) }
+      // El `extraData` no lo devuelve `list` (solo tokens), así que va por documentación:
+      // quién es de verdad se pregunta con `sealers.whois`.
+      try { await client.publish(CANAL, { role: 'sealers', repo }) } catch (e) { log('[sealers] could not announce:', e.message) }
     }
     await anunciar()
     client.on('token', () => { anunciar().catch(() => {}) })
@@ -157,4 +174,4 @@ export function startSealersService ({
   })()
 }
 
-export default { startSealersService, OP, CUOTA }
+export default { startSealersService, OP, WHOIS, CANAL, CUOTA }
