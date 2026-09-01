@@ -1,6 +1,6 @@
 {
   "name": "@dotrino/sealers",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Registro público de cadenas de selladores: un testigo que cualquiera puede clonar. Guarda solo los eslabones donde cambia quién sella una identidad — no las actas.",
   "type": "module",
   "main": "src/index.js",
