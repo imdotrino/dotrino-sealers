@@ -21,7 +21,7 @@
     "start": "node src/cli.js run"
   },
   "dependencies": {
-    "@dotrino/identity": "0.73.0",
+    "@dotrino/identity": "0.73.1",
     "@dotrino/proxy-client": "0.13.1",
     "@dotrino/remote-agent": "0.5.4",
     "@dotrino/vault": "0.42.0"
