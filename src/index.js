@@ -140,9 +140,8 @@ export function startSealersService ({
     const device = link?.device
     const identify = async () => {
       if (!device || !client.token) return
-      const data = { op: 'identify', publickey: device.publickey, token: client.token, ts: Date.now() }
-      const { signature } = await signWithDevice({ privateJwk: device.privateJwk, data })
-      await client.identify({ data, signature })
+      // El sobre lo arma el pilar (`identifyAs`), que le pone el destinatario.
+      await client.identifyAs({ publickey: device.publickey, sign: (d) => signWithDevice({ privateJwk: device.privateJwk, data: d }) })
     }
     await identify()
     client.on('token', () => { identify().catch(() => {}) })
