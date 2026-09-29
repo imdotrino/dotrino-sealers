@@ -9,6 +9,11 @@
 import { fetchSecrets } from '@dotrino/vault/service'
 import { enroll, loadLink, saveLink, dataDir } from '@dotrino/remote-agent/link'
 import { startSealersService } from './index.js'
+import { deviceInfo, formatDeviceInfo } from '@dotrino/vault/device-info'
+import { watchForUpdate } from '@dotrino/update'
+import { createRequire } from 'node:module'
+
+const { version: VERSION } = createRequire(import.meta.url)('../package.json')
 
 const NS = process.env.SEALERS_NS || 'sealers'
 const DIR = process.env.SEALERS_DIR || dataDir('dotrino-sealers')
@@ -18,6 +23,8 @@ const uso = () => {
 
   enroll <invitación>   engancha este servicio al vault (una vez)
   run                   escucha en el proxio y publica los eslabones que lleguen
+  info [--json]         qué aparato es este servicio: su ID (el de «dotrino-vault members»),
+                        su bóveda y sus permisos. Sin red.
 
 Variables:
   SEALERS_REPO   owner/nombre del repo del registro (requerido)
@@ -40,6 +47,12 @@ if (cmd === 'enroll') {
     onChallenge: (c) => console.log(`\nAprueba en la bóveda:  dotrino-vault approve ${c.code || c}\n`)
   })
   console.log('enrolado · proxio', link.proxy)
+} else if (cmd === 'info') {
+  // La pieza común de todos los comandos (CONVENCIONES §15.1): lo que se viene a mirar es el ID.
+  const link = loadLink(DIR)
+  if (!link) { console.error(`sin enrolar (${DIR}): dotrino-sealers enroll <invitación>`); process.exit(1) }
+  const info = await deviceInfo(link, { kind: 'sealers', ns: NS, version: VERSION, dir: DIR })
+  console.log(rest.includes('--json') ? JSON.stringify(info, null, 2) : formatDeviceInfo(info))
 } else if (cmd === 'run') {
   const repo = process.env.SEALERS_REPO
   if (!repo) { console.error('falta SEALERS_REPO (owner/nombre)'); process.exit(2) }
@@ -66,4 +79,9 @@ if (cmd === 'enroll') {
   if (!token) { console.error(`el cajón "${NS}" no tiene GITHUB_TOKEN`); process.exit(1) }
 
   await startSealersService({ token, repo, dir: DIR, link })
+  // §15: una vez al día mira si hay versión nueva y lo dice en el log. Solo avisa.
+  watchForUpdate({
+    current: VERSION, source: 'npm', pkg: '@dotrino/sealers',
+    onNewer: (r) => console.log(`[sealers] version ${r.version} is available (running ${r.current}): npm i -g @dotrino/sealers@${r.version}`)
+  })
 } else uso()
