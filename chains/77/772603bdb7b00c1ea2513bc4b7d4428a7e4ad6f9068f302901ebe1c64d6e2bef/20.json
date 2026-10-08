@@ -1,0 +1,15 @@
+{
+  "v": 1,
+  "profileId": "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"cqKV8P90hnFUVgLYw0TdCCkUwQjm8IdFSAmLmmxyxgE\",\"y\":\"QLoaIv_3UQWJGS-bRiJBjOlJq9V59v2Hruf4hsXshSc\",\"crv\":\"P-256\"}",
+  "seq": 20,
+  "by": "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"cqKV8P90hnFUVgLYw0TdCCkUwQjm8IdFSAmLmmxyxgE\",\"y\":\"QLoaIv_3UQWJGS-bRiJBjOlJq9V59v2Hruf4hsXshSc\",\"crv\":\"P-256\"}",
+  "sealers": [
+    "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"cqKV8P90hnFUVgLYw0TdCCkUwQjm8IdFSAmLmmxyxgE\",\"y\":\"QLoaIv_3UQWJGS-bRiJBjOlJq9V59v2Hruf4hsXshSc\",\"crv\":\"P-256\"}"
+  ],
+  "prev": {
+    "seq": 19,
+    "hash": "3ca8b1be1a96de263dca6d52e3079e5a0286f43c6361ef24df49b18a07bc0f06"
+  },
+  "iat": 1788406466513,
+  "sig": "YO4ugZRIcflXETPbvpKLpgn0I86aBXbCAxFTYLjsjUZjqohdXZm6I9YzMkDolQtgGN2wDlFfcL50XfOe8+Juzw=="
+}
