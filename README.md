@@ -98,6 +98,28 @@ el aparato le quita la escritura, sin tocar el servidor.
 | `SEALERS_NS` | cajón del vault del que sale el token (default: `sealers`) |
 | `SEALERS_DIR` | dónde vive el enlace de este aparato |
 
+## Actualizarse
+
+El testigo **se actualiza solo** (CONVENCIONES §15): mira una vez al día si hay versión nueva,
+comprueba lo que entrega npm contra el `npm-integrity.json` de la release de este repo y
+lo instala. Lo hace `@dotrino/update/npm`; aquí solo se cablea.
+
+```sh
+dotrino-sealers update                    # dice cómo está
+dotrino-sealers update --approval on      # antes de instalar, pide permiso a quien aprueba en tu bóveda
+dotrino-sealers update --notify off       # no avisa de que se actualizó
+```
+
+- Los dos ajustes son de **esta instancia** (viven junto a su enlace) y no tienen que ver
+  con el de la bóveda. Por defecto: se actualiza sin preguntar y avisa.
+- El permiso se pide **una vez por versión**; sin respuesta en un día cuenta como no, y
+  `dotrino-sealers info` lo dice.
+- **Solo se actualiza sola una instalación global de npm en un prefijo del usuario**
+  (`npm i -g @dotrino/sealers` con nvm o un prefijo propio). Si el prefijo es de root, avisa a
+  quien aprueba de que hay versión y necesita permisos de administrador. Con `npx`, dentro
+  de un proyecto o desde un checkout no se toca nada.
+- Solo se reinicia si hay quien lo levante (systemd, pm2).
+
 ## Desarrollo
 
 ```sh
