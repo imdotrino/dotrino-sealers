@@ -24,8 +24,8 @@
  * que haya varios y se puedan comparar. Por eso el repo es público — un `git clone` te
  * convierte en testigo.
  */
-import { validarCadena } from './validate.js'
-import { createGitHub, YaExiste } from './github.js'
+import { validateChain } from './validate.js'
+import { createGitHub, AlreadyExists } from './github.js'
 
 export const OP = 'sealers.publish'
 
@@ -41,7 +41,7 @@ export const OP = 'sealers.publish'
  * código. Re-enrolarlo da un cert nuevo de la misma identidad y sigue solo; revocarlo lo
  * deja fuera del acta y su anuncio deja de valer.
  */
-export const CANAL = 'dotrino.sealers'
+export const CHANNEL = 'dotrino.sealers'
 
 /**
  * «¿QUIÉN ERES?» — el paso que hace útil al canal.
@@ -62,63 +62,63 @@ export const WHOIS = 'sealers.whois'
  * trabajo: comprobar firmas cuesta CPU y escribir cuesta cuota de la API de GitHub. Una
  * cuenta legítima deposita una vez cada muchos meses, así que esto no le roza.
  */
-export const CUOTA = { ventanaMs: 60_000, porVentana: 20 }
+export const QUOTA = { windowMs: 60_000, perWindow: 20 }
 
 export function startSealersService ({
   token, repo, branch = 'main', dir, proxyUrl, log = console.log, github, link, agent = true
 } = {}) {
   const gh = github || createGitHub({ token, repo, branch })
-  const vistos = new Map()
+  const seen = new Map()
 
   /** ¿Este remitente pasó de la cuota? Se dice en el log: un límite callado miente. */
-  function pasaCuota (quien) {
-    const ahora = Date.now()
-    const t = (vistos.get(quien) || []).filter((x) => ahora - x < CUOTA.ventanaMs)
-    if (t.length >= CUOTA.porVentana) {
-      log(`[sealers] rate-limited ${String(quien).slice(0, 8)}: ${t.length} requests in the last minute`)
-      vistos.set(quien, t)
+  function withinQuota (who) {
+    const now = Date.now()
+    const t = (seen.get(who) || []).filter((x) => now - x < QUOTA.windowMs)
+    if (t.length >= QUOTA.perWindow) {
+      log(`[sealers] rate-limited ${String(who).slice(0, 8)}: ${t.length} requests in the last minute`)
+      seen.set(who, t)
       return false
     }
-    t.push(ahora)
-    vistos.set(quien, t)
+    t.push(now)
+    seen.set(who, t)
     return true
   }
 
   /** Atiende una petición. Separado del transporte para poder probarlo sin red. */
-  async function atender (msg, quien = 'anon') {
+  async function handle (msg, who = 'anon') {
     if (msg?.op === WHOIS) return { ok: true, op: WHOIS + '.result', cert: link?.cert || null }
-    if (msg?.op !== OP) return { ok: false, error: 'op desconocida' }
-    if (!pasaCuota(quien)) return { ok: false, error: 'demasiadas peticiones, prueba en un minuto' }
+    if (msg?.op !== OP) return { ok: false, code: 'unknown-op', error: 'unknown op' }
+    if (!withinQuota(who)) return { ok: false, code: 'rate-limited', error: 'too many requests, try again in a minute' }
 
-    const v = await validarCadena(msg.chain)
+    const v = await validateChain(msg.chain)
     if (!v.ok) {
       log(`[sealers] rejected: ${v.error}`)
-      return { ok: false, error: v.error }
+      return { ok: false, code: v.code, error: v.error }
     }
-    const escritos = []
-    const yaEstaban = []
-    for (const a of v.archivos) {
+    const written = []
+    const already = []
+    for (const a of v.files) {
       try {
         // Se mira antes de escribir para poder contestar «ya estaba» en vez de un error:
         // publicar dos veces el mismo eslabón no es fallo de nadie, y va a pasar —
         // publica la cuenta y publica quien la verifica.
-        if (await gh.existe(a.ruta)) { yaEstaban.push(a.ruta); continue }
-        await gh.crear(a.ruta, a.contenido, `${v.id.slice(0, 8)}: eslabón ${a.ruta.split('/').pop().replace('.json', '')}`)
-        escritos.push(a.ruta)
+        if (await gh.exists(a.path)) { already.push(a.path); continue }
+        await gh.create(a.path, a.content, `${v.id.slice(0, 8)}: eslabón ${a.path.split('/').pop().replace('.json', '')}`)
+        written.push(a.path)
       } catch (e) {
-        if (e instanceof YaExiste) { yaEstaban.push(a.ruta); continue }
-        log(`[sealers] could not write ${a.ruta}: ${e.message}`)
-        return { ok: false, error: 'no se pudo publicar: ' + e.message }
+        if (e instanceof AlreadyExists) { already.push(a.path); continue }
+        log(`[sealers] could not write ${a.path}: ${e.message}`)
+        return { ok: false, code: 'publish-failed', error: 'could not publish: ' + e.message }
       }
     }
-    log(`[sealers] ${v.id.slice(0, 8)} seq ${v.seq}: ${escritos.length} nuevo(s), ${yaEstaban.length} ya estaba(n)`)
-    return { ok: true, id: v.id, seq: v.seq, escritos, yaEstaban }
+    log(`[sealers] ${v.id.slice(0, 8)} seq ${v.seq}: ${written.length} new, ${already.length} already present`)
+    return { ok: true, id: v.id, seq: v.seq, escritos: written, yaEstaban: already }
   }
 
   // `agent: false` deja el servicio sin transporte, solo con `atender`. Es como se prueba
   // lo que decide qué se escribe sin depender de una red ni de GitHub — que es justo la
   // parte que no puede fallar.
-  if (!agent) return Promise.resolve({ atender, close: async () => {} })
+  if (!agent) return Promise.resolve({ handle, close: async () => {} })
 
   return (async () => {
     const { installNodeGlobals } = await import('@dotrino/remote-agent/node-globals')
@@ -150,7 +150,7 @@ export function startSealersService ({
       if (payload?.op !== OP && payload?.op !== WHOIS) return
       // Nunca se cae por una petición: un testigo que se muere con un mensaje raro deja de
       // ser testigo justo cuando alguien tiene interés en que lo deje de ser.
-      atender(payload, payload.publickey || from)
+      handle(payload, payload.publickey || from)
         .catch((e) => ({ ok: false, error: e.message }))
         .then((r) => { try { client.send(from, { op: r.op || OP + '.result', ...r }) } catch (_) {} })
     })
@@ -160,17 +160,17 @@ export function startSealersService ({
     const id = device?.publickey ? (await pubkeyId(device.publickey)).slice(0, 8).toUpperCase() : '????????'
     // ANUNCIARSE. Se republica en cada reconexión porque el canal va por token de sesión:
     // al reconectar el token es otro y el anuncio viejo ya no lleva a ninguna parte.
-    const anunciar = async () => {
+    const announce = async () => {
       // El `extraData` no lo devuelve `list` (solo tokens), así que va por documentación:
       // quién es de verdad se pregunta con `sealers.whois`.
-      try { await client.publish(CANAL, { role: 'sealers', repo }) } catch (e) { log('[sealers] could not announce:', e.message) }
+      try { await client.publish(CHANNEL, { role: 'sealers', repo }) } catch (e) { log('[sealers] could not announce:', e.message) }
     }
-    await anunciar()
-    client.on('token', () => { anunciar().catch(() => {}) })
+    await announce()
+    client.on('token', () => { announce().catch(() => {}) })
 
-    log(`[sealers] listening on the proxy as ${id} · repo ${repo} · announced in ${CANAL}`)
-    return { atender, client, id, pubkey: device?.publickey, close: async () => { try { client.disconnect?.() } catch (_) {} } }
+    log(`[sealers] listening on the proxy as ${id} · repo ${repo} · announced in ${CHANNEL}`)
+    return { handle, client, id, pubkey: device?.publickey, close: async () => { try { client.disconnect?.() } catch (_) {} } }
   })()
 }
 
-export default { startSealersService, OP, WHOIS, CANAL, CUOTA }
+export default { startSealersService, OP, WHOIS, CHANNEL, QUOTA }

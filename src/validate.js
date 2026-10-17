@@ -24,13 +24,13 @@ import { verifySealerLinkChain } from '@dotrino/identity/acta'
 import { pubkeyId } from '@dotrino/identity/capabilities'
 
 /** Un eslabón son ocho campos: 2 KB de sobra. El tope es contra el que mande basura. */
-export const MAX_ESLABON = 8 * 1024
+export const MAX_LINK_BYTES = 8 * 1024
 /** Y una cadena razonable no tiene cientos: cambiar de bóveda es raro. */
-export const MAX_ESLABONES = 64
+export const MAX_LINKS = 64
 
 /** Dónde vive el eslabón `seq` de una identidad. Repartido por los dos primeros
  *  caracteres para no acabar con un directorio plano de miles de entradas. */
-export function rutaDe (id, seq) {
+export function pathOf (id, seq) {
   return `chains/${id.slice(0, 2)}/${id}/${seq}.json`
 }
 
@@ -39,23 +39,23 @@ export function rutaDe (id, seq) {
  *  No es privacidad —tu `profileId` viaja en cada firma tuya, así que quien te haya leído
  *  puede calcularlo— sino NO ENUMERABILIDAD: quien se descargue el registro entero no se
  *  lleva una lista de llaves públicas lista para correlacionar. */
-export const idDe = (profileId) => pubkeyId(profileId)
+export const idOf = (profileId) => pubkeyId(profileId)
 
 /**
  * ¿Se acepta esta cadena? Devuelve los archivos a escribir, o por qué no.
  *
- * @returns {Promise<{ok:true, id:string, profileId:string, archivos:{ruta:string,contenido:string}[]}
- *                 | {ok:false, error:string}>}
+ * @returns {Promise<{ok:true, id:string, profileId:string, files:{path:string,content:string}[]}
+ *                 | {ok:false, code:string, error:string}>}
  */
-export async function validarCadena (chain) {
-  if (!Array.isArray(chain) || !chain.length) return { ok: false, error: 'cadena vacía' }
-  if (chain.length > MAX_ESLABONES) return { ok: false, error: `demasiados eslabones (máx ${MAX_ESLABONES})` }
+export async function validateChain (chain) {
+  if (!Array.isArray(chain) || !chain.length) return { ok: false, code: 'empty-chain', error: 'empty chain' }
+  if (chain.length > MAX_LINKS) return { ok: false, code: 'too-many-links', error: `too many links (max ${MAX_LINKS})` }
 
   // NO SE ADMITE UN ACTA. Se dice con su nombre porque es el error que más va a pasar:
   // hasta identity 0.72 la cadena eran actas, y una lleva dentro tus aparatos. Si trae
   // `members`, el que la manda cree que está publicando poco y no lo está.
   if (chain.some((a) => a && (a.members || a.keyring || a.card))) {
-    return { ok: false, error: 'esto es un acta, no un eslabón: lleva dentro tus aparatos. Publica `sealerLinkOf(acta)` (identity >= 0.72)' }
+    return { ok: false, code: 'acta-not-link', error: 'this is an acta, not a link: it carries your devices. Publish `sealerLinkOf(acta)` (identity >= 0.72)' }
   }
 
   // AL MENOS DOS. Un génesis suelto no se admite y no es por ahorrar espacio: una cuenta
@@ -63,18 +63,18 @@ export async function validarCadena (chain) {
   // no puede cambiar— así que no hay nada que refrescar. Admitirla convertiría el registro
   // en un directorio de identidades, que es justo lo que no debe ser.
   if (chain.length < 2) {
-    return { ok: false, error: 'una cadena de un solo eslabón no tiene nada que refrescar: no se admite' }
+    return { ok: false, code: 'single-link', error: 'a single-link chain has nothing to refresh: not accepted' }
   }
 
   const v = await verifySealerLinkChain(chain)
-  if (!v.ok) return { ok: false, error: 'cadena inválida: ' + v.reason }
+  if (!v.ok) return { ok: false, code: 'invalid-chain', error: 'invalid chain: ' + v.reason }
 
-  const id = await idDe(v.profileId)
-  const archivos = []
+  const id = await idOf(v.profileId)
+  const files = []
   for (const a of chain) {
-    const contenido = JSON.stringify(a, null, 2) + '\n'
-    if (contenido.length > MAX_ESLABON) return { ok: false, error: `eslabón ${a.seq} demasiado grande` }
-    archivos.push({ ruta: rutaDe(id, a.seq), contenido })
+    const content = JSON.stringify(a, null, 2) + '\n'
+    if (content.length > MAX_LINK_BYTES) return { ok: false, code: 'link-too-large', error: `link ${a.seq} too large` }
+    files.push({ path: pathOf(id, a.seq), content })
   }
-  return { ok: true, id, profileId: v.profileId, seq: v.seq, archivos }
+  return { ok: true, id, profileId: v.profileId, seq: v.seq, files }
 }

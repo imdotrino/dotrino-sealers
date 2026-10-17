@@ -16,56 +16,56 @@
  */
 import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
-import { validarCadena, rutaDe } from '../src/validate.js'
+import { validateChain, pathOf } from '../src/validate.js'
 
 const base = process.argv[2] || 'origin/main'
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trim()
 
-const cambios = git('diff', '--name-status', `${base}...HEAD`).split('\n').filter(Boolean)
-  .map((l) => { const [estado, ...resto] = l.split('\t'); return { estado: estado[0], ruta: resto[resto.length - 1] } })
+const changes = git('diff', '--name-status', `${base}...HEAD`).split('\n').filter(Boolean)
+  .map((l) => { const [status, ...rest] = l.split('\t'); return { status: status[0], path: rest[rest.length - 1] } })
 
-const problemas = []
-const identidades = new Set()
+const problems = []
+const identities = new Set()
 
-for (const { estado, ruta } of cambios) {
-  if (!ruta.startsWith('chains/')) {
+for (const { status, path } of changes) {
+  if (!path.startsWith('chains/')) {
     // Fuera de `chains/` es el repo en sí (README, el propio validador): eso se revisa a
     // ojo como cualquier PR, no lo juzga este script.
     continue
   }
-  if (ruta.endsWith('/.gitkeep')) continue
-  if (estado !== 'A') {
-    problemas.push(`${ruta}: ${estado === 'D' ? 'borrado' : 'modificado'} — el registro solo admite añadir`)
+  if (path.endsWith('/.gitkeep')) continue
+  if (status !== 'A') {
+    problems.push(`${path}: ${status === 'D' ? 'deleted' : 'modified'} — the registry only accepts additions`)
     continue
   }
-  const m = ruta.match(/^chains\/([0-9a-f]{2})\/([0-9a-f]{8,})\/(\d+)\.json$/)
-  if (!m) { problemas.push(`${ruta}: no es una ruta válida (chains/<xx>/<id>/<seq>.json)`); continue }
-  const [, prefijo, id, seq] = m
-  if (!id.startsWith(prefijo)) { problemas.push(`${ruta}: el prefijo no coincide con el id`); continue }
-  if (ruta !== rutaDe(id, Number(seq))) { problemas.push(`${ruta}: ruta no canónica`); continue }
-  identidades.add(`${prefijo}/${id}`)
+  const m = path.match(/^chains\/([0-9a-f]{2})\/([0-9a-f]{8,})\/(\d+)\.json$/)
+  if (!m) { problems.push(`${path}: not a valid path (chains/<xx>/<id>/<seq>.json)`); continue }
+  const [, prefix, id, seq] = m
+  if (!id.startsWith(prefix)) { problems.push(`${path}: the prefix does not match the id`); continue }
+  if (path !== pathOf(id, Number(seq))) { problems.push(`${path}: non-canonical path`); continue }
+  identities.add(`${prefix}/${id}`)
 }
 
 // Cada identidad tocada se verifica ENTERA: los eslabones que ya estaban más los del PR.
-for (const rel of identidades) {
+for (const rel of identities) {
   const dir = `chains/${rel}`
-  if (!existsSync(dir)) { problemas.push(`${dir}: no existe`); continue }
-  const cadena = readdirSync(dir).filter((f) => f.endsWith('.json'))
+  if (!existsSync(dir)) { problems.push(`${dir}: does not exist`); continue }
+  const chain = readdirSync(dir).filter((f) => f.endsWith('.json'))
     .map((f) => ({ seq: Number(f.replace('.json', '')), f }))
     .sort((a, b) => a.seq - b.seq)
     .map(({ f }) => JSON.parse(readFileSync(`${dir}/${f}`, 'utf8')))
 
-  const v = await validarCadena(cadena)
-  if (!v.ok) { problemas.push(`${dir}: ${v.error}`); continue }
-  if (`chains/${rel}` !== rutaDe(v.id, cadena[0].seq).replace(/\/\d+\.json$/, '')) {
-    problemas.push(`${dir}: la carpeta no corresponde al profileId de la cadena`)
+  const v = await validateChain(chain)
+  if (!v.ok) { problems.push(`${dir}: ${v.error}`); continue }
+  if (`chains/${rel}` !== pathOf(v.id, chain[0].seq).replace(/\/\d+\.json$/, '')) {
+    problems.push(`${dir}: the folder does not match the chain profileId`)
     continue
   }
-  console.log(`ok  ${dir}  (${cadena.length} eslabones, hasta seq ${v.seq})`)
+  console.log(`ok  ${dir}  (${chain.length} links, up to seq ${v.seq})`)
 }
 
-if (problemas.length) {
-  console.error('\nNo se puede aceptar:\n' + problemas.map((p) => '  · ' + p).join('\n'))
+if (problems.length) {
+  console.error('\nCannot accept:\n' + problems.map((p) => '  · ' + p).join('\n'))
   process.exit(1)
 }
-console.log(problemas.length ? '' : `\n${identidades.size} identidad(es) verificada(s).`)
+console.log(problems.length ? '' : `\n${identities.size} identity(ies) verified.`)

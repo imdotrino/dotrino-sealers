@@ -19,7 +19,7 @@ const { version: VERSION } = createRequire(import.meta.url)('../package.json')
 const NS = process.env.SEALERS_NS || 'sealers'
 const DIR = process.env.SEALERS_DIR || dataDir('dotrino-sealers')
 
-const uso = () => {
+const usage = () => {
   console.log(`dotrino-sealers — el testigo del registro de cadenas de selladores
 
   enroll <invitación>   engancha este servicio al vault (una vez)
@@ -42,13 +42,13 @@ El token de GitHub sale del cajón, no del entorno: en el vault, \`secret set ${
 const [cmd, ...rest] = process.argv.slice(2)
 
 if (cmd === 'enroll') {
-  const invitacion = rest.join(' ').trim()
-  if (!invitacion) { console.error('uso: dotrino-sealers enroll <invitación>'); process.exit(2) }
+  const invitation = rest.join(' ').trim()
+  if (!invitation) { console.error('uso: dotrino-sealers enroll <invitación>'); process.exit(2) }
   // `ns` no es decoración: hace que el enrolamiento EXIJA que el cert traiga
   // `vault:secrets:sealers`. Sin eso el servicio entraría en la cuenta y descubriría al
   // arrancar que no puede leer su cajón — o peor, que le dieron uno que no es el suyo.
   const link = await enroll({
-    qr: invitacion, dir: DIR, label: 'sealers', ns: NS,
+    qr: invitation, dir: DIR, label: 'sealers', ns: NS,
     onChallenge: (c) => console.log(`\nAprueba en la bóveda:  dotrino-vault approve ${c.code || c}\n`)
   })
   console.log('enrolado · proxio', link.proxy)
@@ -61,8 +61,8 @@ if (cmd === 'enroll') {
   // Y si hay una actualización que no se instaló (no se aprobó, o necesita root), se dice
   // aquí. Fuera del JSON, que lo lee una máquina.
   if (!rest.includes('--json')) {
-    const estado = updateStatusText({ dir: DIR, current: VERSION, lang: 'es' })
-    if (estado) console.log('\n' + estado)
+    const status = updateStatusText({ dir: DIR, current: VERSION, lang: 'es' })
+    if (status) console.log('\n' + status)
   }
 } else if (cmd === 'update') {
   // Los dos ajustes de actualización de ESTA instancia (CONVENCIONES §15). Sin red.
@@ -72,13 +72,13 @@ if (cmd === 'enroll') {
   process.exit(r.ok ? 0 : 2)
 } else if (cmd === 'run') {
   const repo = process.env.SEALERS_REPO
-  if (!repo) { console.error('falta SEALERS_REPO (owner/nombre)'); process.exit(2) }
+  if (!repo) { console.error('missing SEALERS_REPO (owner/name)'); process.exit(2) }
   const link = loadLink(DIR)
-  if (!link?.cert) { console.error('sin enrolar: dotrino-sealers enroll <invitación>'); process.exit(2) }
+  if (!link?.cert) { console.error('not enrolled: dotrino-sealers enroll <invitation>'); process.exit(2) }
 
   // ESPERAR AL VAULT es la regla del ecosistema: sin el cajón no se arranca a medias con
   // un token de otro sitio, porque entonces el vault dejaría de mandar sobre este servicio.
-  const secretos = await fetchSecrets({
+  const secrets = await fetchSecrets({
     ns: NS, proxyUrl: link.proxy, masterPubkey: link.iss,
     device: link.device, cert: link.cert, enc: link.enc,
     // EL PAPEL RENOVADO LO GUARDAMOS NOSOTROS. Esta identidad vive en NUESTRO archivo y le
@@ -87,13 +87,13 @@ if (cmd === 'enroll') {
     // cambiaba nunca — o sea que la migración no terminaba.
     onCert: (cert) => {
       link.cert = cert
-      try { saveLink(DIR, link); console.log('[sealers] papel renovado · acta', cert.seq) } catch (e) {
-        console.error('[sealers] no pude guardar el papel renovado:', e.message)
+      try { saveLink(DIR, link); console.log('[sealers] cert renewed · acta', cert.seq) } catch (e) {
+        console.error('[sealers] could not save the renewed cert:', e.message)
       }
     }
   })
-  const token = secretos?.GITHUB_TOKEN
-  if (!token) { console.error(`el cajón "${NS}" no tiene GITHUB_TOKEN`); process.exit(1) }
+  const token = secrets?.GITHUB_TOKEN
+  if (!token) { console.error(`[sealers] the "${NS}" vault namespace has no GITHUB_TOKEN`); process.exit(1) }
 
   const service = await startSealersService({ token, repo, dir: DIR, link })
   // §15: SE ACTUALIZA SOLO. Mira al arrancar y una vez al día; lo que baja se comprueba
@@ -107,4 +107,4 @@ if (cmd === 'enroll') {
     restart: () => { Promise.resolve(service?.close?.()).catch(() => {}).finally(() => process.exit(0)) },
     log: (m) => console.log(m)
   })
-} else uso()
+} else usage()

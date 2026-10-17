@@ -12,15 +12,15 @@
 const API = 'https://api.github.com'
 
 /** Un eslabón ya publicado no se reescribe: eso es lo que hace del registro un registro. */
-export class YaExiste extends Error {
-  constructor (ruta) { super('ya publicado: ' + ruta); this.code = 'ya-existe' }
+export class AlreadyExists extends Error {
+  constructor (filePath) { super('already published: ' + filePath); this.code = 'already-exists' }
 }
 
 export function createGitHub ({ token, repo, branch = 'main', fetch: f = globalThis.fetch } = {}) {
-  if (!token) throw new Error('github: falta el token')
-  if (!/^[\w.-]+\/[\w.-]+$/.test(repo || '')) throw new Error('github: repo debe ser "owner/nombre"')
+  if (!token) throw new Error('github: missing token')
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo || '')) throw new Error('github: repo must be "owner/name"')
 
-  const cabeceras = {
+  const headers = {
     authorization: `Bearer ${token}`,
     accept: 'application/vnd.github+json',
     'x-github-api-version': '2022-11-28',
@@ -29,31 +29,31 @@ export function createGitHub ({ token, repo, branch = 'main', fetch: f = globalT
 
   /** ¿Está ya este eslabón? Se pregunta antes de escribir para poder contestar «ya estaba»
    *  en vez de un error de la API: publicar dos veces lo mismo no es un fallo de nadie. */
-  async function existe (ruta) {
-    const r = await f(`${API}/repos/${repo}/contents/${encodeURI(ruta)}?ref=${encodeURIComponent(branch)}`, { headers: cabeceras })
+  async function exists (filePath) {
+    const r = await f(`${API}/repos/${repo}/contents/${encodeURI(filePath)}?ref=${encodeURIComponent(branch)}`, { headers: headers })
     if (r.status === 404) return false
-    if (!r.ok) throw new Error(`github: ${r.status} al mirar ${ruta}`)
+    if (!r.ok) throw new Error(`github: ${r.status} checking ${filePath}`)
     return true
   }
 
-  async function crear (ruta, contenido, mensaje) {
-    const r = await f(`${API}/repos/${repo}/contents/${encodeURI(ruta)}`, {
+  async function create (filePath, content, commitMessage) {
+    const r = await f(`${API}/repos/${repo}/contents/${encodeURI(filePath)}`, {
       method: 'PUT',
-      headers: { ...cabeceras, 'content-type': 'application/json' },
+      headers: { ...headers, 'content-type': 'application/json' },
       body: JSON.stringify({
-        message: mensaje,
+        message: commitMessage,
         branch,
-        content: Buffer.from(contenido, 'utf8').toString('base64')
+        content: Buffer.from(content, 'utf8').toString('base64')
       })
     })
     // 422 = ya existe. Sin `sha` la API se niega a pisar, que es exactamente lo que se
     // quiere: el append-only lo hace cumplir GitHub, no este código.
-    if (r.status === 422) throw new YaExiste(ruta)
-    if (!r.ok) throw new Error(`github: ${r.status} al escribir ${ruta}: ${(await r.text()).slice(0, 200)}`)
+    if (r.status === 422) throw new AlreadyExists(filePath)
+    if (!r.ok) throw new Error(`github: ${r.status} writing ${filePath}: ${(await r.text()).slice(0, 200)}`)
     return true
   }
 
-  return { existe, crear }
+  return { exists, create }
 }
 
-export default { createGitHub, YaExiste }
+export default { createGitHub, AlreadyExists }
