@@ -64,7 +64,7 @@ test('un eslabón fabricado para el profileId de otro NO entra', async () => {
 
   const r = await validateChain([sealerLinkOf(genesis), forged])
   assert.equal(r.ok, false)
-  assert.match(r.error, /no-encadena|sellador-no-autorizado/)
+  assert.match(r.error, /not-chained|unauthorized-sealer/)
 })
 
 test('un ACTA se rechaza diciendo por qué: lleva dentro tus aparatos', async () => {
