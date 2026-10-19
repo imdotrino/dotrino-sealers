@@ -112,7 +112,7 @@ export function startSealersService ({
       }
     }
     log(`[sealers] ${v.id.slice(0, 8)} seq ${v.seq}: ${written.length} new, ${already.length} already present`)
-    return { ok: true, id: v.id, seq: v.seq, escritos: written, yaEstaban: already }
+    return { ok: true, id: v.id, seq: v.seq, written, alreadyPresent: already }
   }
 
   // `agent: false` deja el servicio sin transporte, solo con `atender`. Es como se prueba

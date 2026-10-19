@@ -46,14 +46,14 @@ test('una cadena buena se escribe entera, y repetirla NO es un error', async () 
 
   const a = await s.handle({ op: OP, chain })
   assert.equal(a.ok, true, a.error)
-  assert.equal(a.escritos.length, 2)
+  assert.equal(a.written.length, 2)
   assert.equal(gh.files.size, 2)
 
   // Va a pasar de verdad: publica la cuenta y publica quien la verifica.
   const b = await s.handle({ op: OP, chain })
   assert.equal(b.ok, true)
-  assert.equal(b.escritos.length, 0)
-  assert.equal(b.yaEstaban.length, 2)
+  assert.equal(b.written.length, 0)
+  assert.equal(b.alreadyPresent.length, 2)
   assert.equal(gh.files.size, 2, 'no se escribió nada nuevo')
 })
 

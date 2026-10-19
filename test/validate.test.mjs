@@ -19,21 +19,21 @@ const seal = (acta, k) => sealActa({ acta, privateJwk: k.privateJwk })
  * Lo que se publica NO son las actas sino sus ESLABONES (`sealerLinkOf`): ocho campos que
  * no dicen nada de los aparatos. Las actas se quedan aquí, que es su sitio.
  */
-async function account ({ conSegunda = true } = {}) {
+async function account ({ withSecond = true } = {}) {
   const A = await makeDeviceKey()
   const B = await makeDeviceKey()
   const genesis = await seal(genesisActa({ pub: A.publickey, label: 'A' }), A)
-  if (!conSegunda) return { A, B, genesis, cadena: [sealerLinkOf(genesis)] }
+  if (!withSecond) return { A, B, genesis, chain: [sealerLinkOf(genesis)] }
   let two = await applyChanges(genesis, [
     { op: 'admit', member: { pub: B.publickey, label: 'B', caps: ['sign', 'sealer'] } }
   ], { by: A.publickey })
   two = await seal(two, A)
-  return { A, B, genesis, two, cadena: [sealerLinkOf(genesis), sealerLinkOf(two)] }
+  return { A, B, genesis, two, chain: [sealerLinkOf(genesis), sealerLinkOf(two)] }
 }
 
 test('una cadena legítima entra, y solo escribe los eslabones', async () => {
-  const { genesis, cadena } = await account()
-  const r = await validateChain(cadena)
+  const { genesis, chain } = await account()
+  const r = await validateChain(chain)
   assert.equal(r.ok, true, r.error)
   assert.equal(r.profileId, genesis.profileId)
   assert.equal(r.files.length, 2, 'el génesis y la entrada de la segunda bóveda')
@@ -47,14 +47,14 @@ test('una cadena legítima entra, y solo escribe los eslabones', async () => {
  * en un directorio de identidades, que es justo lo que no debe ser.
  */
 test('un génesis suelto NO se admite: no hay nada que refrescar', async () => {
-  const { cadena } = await account({ conSegunda: false })
-  const r = await validateChain(cadena)
+  const { chain } = await account({ withSecond: false })
+  const r = await validateChain(chain)
   assert.equal(r.ok, false)
   assert.equal(r.code, 'single-link')
 })
 
 test('un eslabón fabricado para el profileId de otro NO entra', async () => {
-  const { genesis } = await account({ conSegunda: false })
+  const { genesis } = await account({ withSecond: false })
   const bad = await makeDeviceKey()
   // Con tu `profileId` —que es público— alguien firma un eslabón donde él sella. Verifica
   // solo (está firmado, por él), y por eso el registro no se fía de un eslabón suelto: lo
