@@ -30,6 +30,11 @@ export const MAX_LINKS = 64
 
 /** Dónde vive el eslabón `seq` de una identidad. Repartido por los dos primeros
  *  caracteres para no acabar con un directorio plano de miles de entradas. */
+/**
+ * @param {string} id
+ * @param {number} seq
+ * @returns {string}
+ */
 export function pathOf (id, seq) {
   return `chains/${id.slice(0, 2)}/${id}/${seq}.json`
 }
@@ -39,12 +44,13 @@ export function pathOf (id, seq) {
  *  No es privacidad —tu `profileId` viaja en cada firma tuya, así que quien te haya leído
  *  puede calcularlo— sino NO ENUMERABILIDAD: quien se descargue el registro entero no se
  *  lleva una lista de llaves públicas lista para correlacionar. */
-export const idOf = (profileId) => pubkeyId(profileId)
+export const idOf = (/** @type {string} */ profileId) => pubkeyId(profileId)
 
 /**
  * ¿Se acepta esta cadena? Devuelve los archivos a escribir, o por qué no.
  *
- * @returns {Promise<{ok:true, id:string, profileId:string, files:{path:string,content:string}[]}
+ * @param {unknown} chain  lo que llegó por la red, sin comprobar
+ * @returns {Promise<{ok:true, id:string, profileId:string, seq:number, files:{path:string,content:string}[]}
  *                 | {ok:false, code:string, error:string}>}
  */
 export async function validateChain (chain) {

@@ -39,13 +39,14 @@ export const REPO = 'imdotrino/dotrino-sealers'
  */
 export function startSelfUpdate ({ version, dir, conn = null, restart, log = console.log, watch = watchSelfUpdateNpm, hooks = vaultUpdateHooks }) {
   // Los ganchos son de la librería de la bóveda; aquí solo se arman con la identidad de AHORA.
-  const now = () => hooks({ product: PKG, log, ...conn() })
+  // Sin `conn` no hay ganchos: ni se pregunta ni se avisa (ver arriba).
+  const now = conn && (() => hooks({ product: PKG, log, ...conn() }))
   return watch({
     pkg: PKG,
     current: version,
     repo: REPO,
     dir,
-    ...(conn
+    ...(now
       ? {
           mayUpdate: (u) => now().mayUpdate(u),
           onUpdated: (u) => now().onUpdated(u),

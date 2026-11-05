@@ -13,9 +13,21 @@ const API = 'https://api.github.com'
 
 /** Un eslabón ya publicado no se reescribe: eso es lo que hace del registro un registro. */
 export class AlreadyExists extends Error {
+  /** @param {string} filePath */
   constructor (filePath) { super('already published: ' + filePath); this.code = 'already-exists' }
 }
 
+/**
+ * @typedef {object} GitHubRegistry
+ * @property {(filePath: string) => Promise<boolean>} exists
+ * @property {(filePath: string, content: string, commitMessage: string) => Promise<true>} create
+ */
+
+/**
+ * Escribe en `repo` por la API de contenidos; nunca pisa un archivo.
+ * @param {{ token?: string, repo?: string, branch?: string, fetch?: typeof globalThis.fetch }} [o]
+ * @returns {GitHubRegistry}
+ */
 export function createGitHub ({ token, repo, branch = 'main', fetch: f = globalThis.fetch } = {}) {
   if (!token) throw new Error('github: missing token')
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo || '')) throw new Error('github: repo must be "owner/name"')
@@ -29,6 +41,7 @@ export function createGitHub ({ token, repo, branch = 'main', fetch: f = globalT
 
   /** ¿Está ya este eslabón? Se pregunta antes de escribir para poder contestar «ya estaba»
    *  en vez de un error de la API: publicar dos veces lo mismo no es un fallo de nadie. */
+  /** @param {string} filePath */
   async function exists (filePath) {
     const r = await f(`${API}/repos/${repo}/contents/${encodeURI(filePath)}?ref=${encodeURIComponent(branch)}`, { headers: headers })
     if (r.status === 404) return false
@@ -36,6 +49,12 @@ export function createGitHub ({ token, repo, branch = 'main', fetch: f = globalT
     return true
   }
 
+  /**
+   * @param {string} filePath
+   * @param {string} content
+   * @param {string} commitMessage
+   * @returns {Promise<true>}
+   */
   async function create (filePath, content, commitMessage) {
     const r = await f(`${API}/repos/${repo}/contents/${encodeURI(filePath)}`, {
       method: 'PUT',

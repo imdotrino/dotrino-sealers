@@ -64,13 +64,56 @@ export const WHOIS = 'sealers.whois'
  */
 export const QUOTA = { windowMs: 60_000, perWindow: 20 }
 
+/**
+ * Lo que contesta el testigo a una petición.
+ * @typedef {object} SealersReply
+ * @property {boolean} ok
+ * @property {string} [op]
+ * @property {string} [code]
+ * @property {string} [error]
+ * @property {unknown} [cert]          `sealers.whois`: el cert de este aparato
+ * @property {string} [id]
+ * @property {number} [seq]
+ * @property {string[]} [written]
+ * @property {string[]} [alreadyPresent]
+ */
+
+/**
+ * @typedef {object} SealersOptions
+ * @property {string} [token]     token de GitHub (sale del cajón del vault)
+ * @property {string} [repo]      owner/nombre del repo del registro
+ * @property {string} [branch]
+ * @property {string} [dir]       carpeta del enlace de este aparato
+ * @property {string} [proxyUrl]
+ * @property {(...args: unknown[]) => void} [log]
+ * @property {import('./github.js').GitHubRegistry} [github]  para probar sin GitHub
+ * @property {SealersLink} [link]
+ * @property {boolean} [agent]    `false`: sin transporte, solo `handle`
+ */
+
+/**
+ * @typedef {object} SealersService
+ * @property {(msg: any, who?: string) => Promise<SealersReply>} handle
+ *   `msg` es lo que llegó por la red, sin comprobar: `handle` mira su `op` antes de usarlo.
+ * @property {() => Promise<void>} close
+ * @property {import('@dotrino/proxy-client').WebSocketProxyClient} [client]
+ * @property {string} [id]
+ * @property {string} [pubkey]
+ */
+
+/**
+ * @param {SealersOptions} [o]
+ * @returns {Promise<SealersService>}
+ */
 export function startSealersService ({
   token, repo, branch = 'main', dir, proxyUrl, log = console.log, github, link, agent = true
 } = {}) {
   const gh = github || createGitHub({ token, repo, branch })
+  /** @type {Map<string, number[]>} */
   const seen = new Map()
 
   /** ¿Este remitente pasó de la cuota? Se dice en el log: un límite callado miente. */
+  /** @param {string} who */
   function withinQuota (who) {
     const now = Date.now()
     const t = (seen.get(who) || []).filter((x) => now - x < QUOTA.windowMs)
@@ -85,6 +128,11 @@ export function startSealersService ({
   }
 
   /** Atiende una petición. Separado del transporte para poder probarlo sin red. */
+  /**
+   * @param {any} msg
+   * @param {string} [who]
+   * @returns {Promise<SealersReply>}
+   */
   async function handle (msg, who = 'anon') {
     if (msg?.op === WHOIS) return { ok: true, op: WHOIS + '.result', cert: link?.cert || null }
     if (msg?.op !== OP) return { ok: false, code: 'unknown-op', error: 'unknown op' }
@@ -103,12 +151,13 @@ export function startSealersService ({
         // publicar dos veces el mismo eslabón no es fallo de nadie, y va a pasar —
         // publica la cuenta y publica quien la verifica.
         if (await gh.exists(a.path)) { already.push(a.path); continue }
-        await gh.create(a.path, a.content, `${v.id.slice(0, 8)}: eslabón ${a.path.split('/').pop().replace('.json', '')}`)
+        await gh.create(a.path, a.content, `${v.id.slice(0, 8)}: eslabón ${/** @type {string} */ (a.path.split('/').pop()).replace('.json', '')}`)
         written.push(a.path)
       } catch (e) {
         if (e instanceof AlreadyExists) { already.push(a.path); continue }
-        log(`[sealers] could not write ${a.path}: ${e.message}`)
-        return { ok: false, code: 'publish-failed', error: 'could not publish: ' + e.message }
+        const why = /** @type {Error} */ (e).message
+        log(`[sealers] could not write ${a.path}: ${why}`)
+        return { ok: false, code: 'publish-failed', error: 'could not publish: ' + why }
       }
     }
     log(`[sealers] ${v.id.slice(0, 8)} seq ${v.seq}: ${written.length} new, ${already.length} already present`)
@@ -151,7 +200,7 @@ export function startSealersService ({
       // Nunca se cae por una petición: un testigo que se muere con un mensaje raro deja de
       // ser testigo justo cuando alguien tiene interés en que lo deje de ser.
       handle(payload, payload.publickey || from)
-        .catch((e) => ({ ok: false, error: e.message }))
+        .catch((e) => /** @type {SealersReply} */ ({ ok: false, error: e.message }))
         .then((r) => { try { client.send(from, { op: r.op || OP + '.result', ...r }) } catch (_) {} })
     })
 
@@ -163,7 +212,7 @@ export function startSealersService ({
     const announce = async () => {
       // El `extraData` no lo devuelve `list` (solo tokens), así que va por documentación:
       // quién es de verdad se pregunta con `sealers.whois`.
-      try { await client.publish(CHANNEL, { role: 'sealers', repo }) } catch (e) { log('[sealers] could not announce:', e.message) }
+      try { await client.publish(CHANNEL, { role: 'sealers', repo }) } catch (e) { log('[sealers] could not announce:', /** @type {Error} */ (e).message) }
     }
     await announce()
     client.on('token', () => { announce().catch(() => {}) })

@@ -88,7 +88,7 @@ if (cmd === 'enroll') {
     onCert: (cert) => {
       link.cert = cert
       try { saveLink(DIR, link); console.log('[sealers] cert renewed · acta', cert.seq) } catch (e) {
-        console.error('[sealers] could not save the renewed cert:', e.message)
+        console.error('[sealers] could not save the renewed cert:', /** @type {Error} */ (e).message)
       }
     }
   })

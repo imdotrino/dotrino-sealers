@@ -15,6 +15,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm install
+      - run: npm run type-check
       - name: Pruebas del validador
         run: npm test
       - name: Solo se añade, y la cadena verifica
